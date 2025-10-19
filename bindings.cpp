@@ -24,8 +24,7 @@ PYBIND11_MODULE(chamfer, m) {
              }
 
              const float *train_ptr = static_cast<float *>(train_buf.ptr);
-             const int32_t *counts_ptr =
-                 static_cast<int32_t *>(counts_buf.ptr);
+             const int32_t *counts_ptr = static_cast<int32_t *>(counts_buf.ptr);
              int num_train_points = counts_buf.shape[0];
              int vec_dim = train_buf.shape[1];
 
@@ -181,8 +180,7 @@ PYBIND11_MODULE(chamfer, m) {
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
-            const int32_t *counts_ptr =
-                static_cast<int32_t *>(counts_buf.ptr);
+            const int32_t *counts_ptr = static_cast<int32_t *>(counts_buf.ptr);
             int num_queries = counts_buf.shape[0];
 
             return self.batch_query(queries_ptr, counts_ptr, num_queries, k);
@@ -228,8 +226,7 @@ PYBIND11_MODULE(chamfer, m) {
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
-            const int32_t *counts_ptr =
-                static_cast<int32_t *>(counts_buf.ptr);
+            const int32_t *counts_ptr = static_cast<int32_t *>(counts_buf.ptr);
             const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = counts_buf.shape[0];
             int num_indices = indices_buf.shape[1];
@@ -244,8 +241,12 @@ PYBIND11_MODULE(chamfer, m) {
             int *result_ptr = static_cast<int *>(result_buf.ptr);
 
             for (int i = 0; i < num_queries; i++) {
-              for (int j = 0; j < k; j++) {
+              int actual_k = static_cast<int>(results[i].size());
+              for (int j = 0; j < actual_k; j++) {
                 result_ptr[i * k + j] = results[i][j];
+              }
+              for (int j = actual_k; j < k; j++) {
+                result_ptr[i * k + j] = -1;
               }
             }
 
@@ -294,8 +295,7 @@ PYBIND11_MODULE(chamfer, m) {
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
-            const int32_t *counts_ptr =
-                static_cast<int32_t *>(counts_buf.ptr);
+            const int32_t *counts_ptr = static_cast<int32_t *>(counts_buf.ptr);
             const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = counts_buf.shape[0];
             int num_indices = indices_buf.shape[1];
@@ -388,6 +388,15 @@ PYBIND11_MODULE(chamfer, m) {
                                        "(num_queries, num_indices)");
             }
 
+            if (!queries_buf.flags_c_contiguous()) {
+              throw std::runtime_error("queries array must be C-contiguous "
+                                       "(use np.ascontiguousarray)");
+            }
+            if (!indices_buf.flags_c_contiguous()) {
+              throw std::runtime_error("indices array must be C-contiguous "
+                                       "(use np.ascontiguousarray)");
+            }
+
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
             const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = queries_buf.shape[0];
@@ -404,8 +413,12 @@ PYBIND11_MODULE(chamfer, m) {
             int *result_ptr = static_cast<int *>(result_buf.ptr);
 
             for (int i = 0; i < num_queries; i++) {
-              for (int j = 0; j < k; j++) {
+              int actual_k = static_cast<int>(results[i].size());
+              for (int j = 0; j < actual_k; j++) {
                 result_ptr[i * k + j] = results[i][j];
+              }
+              for (int j = actual_k; j < k; j++) {
+                result_ptr[i * k + j] = -1;
               }
             }
 

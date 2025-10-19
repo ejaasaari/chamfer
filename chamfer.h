@@ -46,6 +46,11 @@ public:
 
   float compute_chamfer_similarity(const float *q, int32_t count,
                                    int train_point_idx) const {
+    if (train_point_idx < 0 || train_point_idx >= num_train_points) {
+      throw std::runtime_error(
+          "train_point_idx out of bounds: " + std::to_string(train_point_idx) +
+          " (valid range: 0 to " + std::to_string(num_train_points - 1) + ")");
+    }
     const int32_t train_offset = train_offsets[train_point_idx];
     const int32_t train_count = train_counts[train_point_idx];
 
