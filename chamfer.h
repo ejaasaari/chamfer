@@ -267,10 +267,11 @@ public:
     return results;
   }
 
-  std::vector<std::vector<int>>
-  batch_query_subset(const float *queries, const uint32_t *query_counts,
-                     int num_queries, int k,
-                     const std::vector<int> &indices) const {
+  std::vector<std::vector<int>> batch_query_subset(const float *queries,
+                                                   const uint32_t *query_counts,
+                                                   int num_queries, int k,
+                                                   const int *indices_matrix,
+                                                   int num_indices) const {
     std::vector<std::vector<int>> results;
     results.reserve(num_queries);
 
@@ -278,7 +279,13 @@ public:
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + offset;
       uint32_t count = query_counts[i];
-      results.push_back(query_subset(q, count, k, indices));
+
+      std::vector<int> query_indices(num_indices);
+      for (int j = 0; j < num_indices; j++) {
+        query_indices[j] = indices_matrix[i * num_indices + j];
+      }
+
+      results.push_back(query_subset(q, count, k, query_indices));
       offset += count * vec_dim;
     }
 
@@ -287,8 +294,8 @@ public:
 
   std::vector<std::vector<float>>
   batch_distance_to_indices(const float *queries, const uint32_t *query_counts,
-                            int num_queries,
-                            const std::vector<int> &indices) const {
+                            int num_queries, const int *indices_matrix,
+                            int num_indices) const {
     std::vector<std::vector<float>> results;
     results.reserve(num_queries);
 
@@ -296,7 +303,13 @@ public:
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + offset;
       uint32_t count = query_counts[i];
-      results.push_back(distance_to_indices(q, count, indices));
+
+      std::vector<int> query_indices(num_indices);
+      for (int j = 0; j < num_indices; j++) {
+        query_indices[j] = indices_matrix[i * num_indices + j];
+      }
+
+      results.push_back(distance_to_indices(q, count, query_indices));
       offset += count * vec_dim;
     }
 
@@ -322,30 +335,41 @@ public:
   std::vector<std::vector<int>>
   batch_query_subset_fixed(const float *queries, int num_queries,
                            uint32_t query_vec_count, int k,
-                           const std::vector<int> &indices) const {
+                           const int *indices_matrix, int num_indices) const {
     std::vector<std::vector<int>> results;
     results.reserve(num_queries);
 
     uint32_t stride = query_vec_count * vec_dim;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
-      results.push_back(query_subset(q, query_vec_count, k, indices));
+
+      std::vector<int> query_indices(num_indices);
+      for (int j = 0; j < num_indices; j++) {
+        query_indices[j] = indices_matrix[i * num_indices + j];
+      }
+
+      results.push_back(query_subset(q, query_vec_count, k, query_indices));
     }
 
     return results;
   }
 
-  std::vector<std::vector<float>>
-  batch_distance_to_indices_fixed(const float *queries, int num_queries,
-                                  uint32_t query_vec_count,
-                                  const std::vector<int> &indices) const {
+  std::vector<std::vector<float>> batch_distance_to_indices_fixed(
+      const float *queries, int num_queries, uint32_t query_vec_count,
+      const int *indices_matrix, int num_indices) const {
     std::vector<std::vector<float>> results;
     results.reserve(num_queries);
 
     uint32_t stride = query_vec_count * vec_dim;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
-      results.push_back(distance_to_indices(q, query_vec_count, indices));
+
+      std::vector<int> query_indices(num_indices);
+      for (int j = 0; j < num_indices; j++) {
+        query_indices[j] = indices_matrix[i * num_indices + j];
+      }
+
+      results.push_back(distance_to_indices(q, query_vec_count, query_indices));
     }
 
     return results;

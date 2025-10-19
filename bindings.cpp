@@ -210,9 +210,10 @@ PYBIND11_MODULE(chamfer, m) {
           "batch_query_subset",
           [](const Chamfer &self, py::array_t<float> queries,
              py::array_t<uint32_t> query_counts, int k,
-             const std::vector<int> &indices) {
+             py::array_t<int> indices) {
             py::buffer_info queries_buf = queries.request();
             py::buffer_info counts_buf = query_counts.request();
+            py::buffer_info indices_buf = indices.request();
 
             if (queries_buf.ndim != 1) {
               throw std::runtime_error("queries must be a 1-dimensional array");
@@ -221,14 +222,34 @@ PYBIND11_MODULE(chamfer, m) {
               throw std::runtime_error(
                   "query_counts must be a 1-dimensional array");
             }
+            if (indices_buf.ndim != 2) {
+              throw std::runtime_error("indices must be a 2-dimensional array "
+                                       "(num_queries, num_indices)");
+            }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
             const uint32_t *counts_ptr =
                 static_cast<uint32_t *>(counts_buf.ptr);
+            const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = counts_buf.shape[0];
+            int num_indices = indices_buf.shape[1];
 
-            return self.batch_query_subset(queries_ptr, counts_ptr, num_queries,
-                                           k, indices);
+            auto results =
+                self.batch_query_subset(queries_ptr, counts_ptr, num_queries, k,
+                                        indices_ptr, num_indices);
+
+            // Convert to 2D numpy array
+            py::array_t<int> result_array({num_queries, k});
+            auto result_buf = result_array.request();
+            int *result_ptr = static_cast<int *>(result_buf.ptr);
+
+            for (int i = 0; i < num_queries; i++) {
+              for (int j = 0; j < k; j++) {
+                result_ptr[i * k + j] = results[i][j];
+              }
+            }
+
+            return result_array;
           },
           py::arg("queries"), py::arg("query_counts"), py::arg("k"),
           py::arg("indices"),
@@ -243,22 +264,22 @@ PYBIND11_MODULE(chamfer, m) {
                     Number of vectors per query (shape: [num_queries])
                 k : int
                     Number of nearest neighbors to return per query
-                indices : list of int
-                    Subset of training point indices to search
+                indices : numpy.ndarray
+                    2D array of indices to search for each query (shape: [num_queries, num_indices])
 
                 Returns
                 -------
-                list of list of int
-                    For each query, indices of k nearest neighbors from the subset
+                numpy.ndarray
+                    2D array of nearest neighbor indices (shape: [num_queries, k])
             )doc")
 
       .def(
           "batch_distance_to_indices",
           [](const Chamfer &self, py::array_t<float> queries,
-             py::array_t<uint32_t> query_counts,
-             const std::vector<int> &indices) {
+             py::array_t<uint32_t> query_counts, py::array_t<int> indices) {
             py::buffer_info queries_buf = queries.request();
             py::buffer_info counts_buf = query_counts.request();
+            py::buffer_info indices_buf = indices.request();
 
             if (queries_buf.ndim != 1) {
               throw std::runtime_error("queries must be a 1-dimensional array");
@@ -267,14 +288,33 @@ PYBIND11_MODULE(chamfer, m) {
               throw std::runtime_error(
                   "query_counts must be a 1-dimensional array");
             }
+            if (indices_buf.ndim != 2) {
+              throw std::runtime_error("indices must be a 2-dimensional array "
+                                       "(num_queries, num_indices)");
+            }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
             const uint32_t *counts_ptr =
                 static_cast<uint32_t *>(counts_buf.ptr);
+            const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = counts_buf.shape[0];
+            int num_indices = indices_buf.shape[1];
 
-            return self.batch_distance_to_indices(queries_ptr, counts_ptr,
-                                                  num_queries, indices);
+            auto results = self.batch_distance_to_indices(
+                queries_ptr, counts_ptr, num_queries, indices_ptr, num_indices);
+
+            // Convert to 2D numpy array
+            py::array_t<float> result_array({num_queries, num_indices});
+            auto result_buf = result_array.request();
+            float *result_ptr = static_cast<float *>(result_buf.ptr);
+
+            for (int i = 0; i < num_queries; i++) {
+              for (int j = 0; j < num_indices; j++) {
+                result_ptr[i * num_indices + j] = results[i][j];
+              }
+            }
+
+            return result_array;
           },
           py::arg("queries"), py::arg("query_counts"), py::arg("indices"),
           R"doc(
@@ -286,13 +326,13 @@ PYBIND11_MODULE(chamfer, m) {
                     Flattened array of all query vectors (shape: [total_query_vectors * vec_dim])
                 query_counts : numpy.ndarray
                     Number of vectors per query (shape: [num_queries])
-                indices : list of int
-                    Training point indices to compute distances to
+                indices : numpy.ndarray
+                    2D array of indices to compute distances for each query (shape: [num_queries, num_indices])
 
                 Returns
                 -------
-                list of list of float
-                    For each query, Chamfer similarity scores to the specified indices
+                numpy.ndarray
+                    2D array of Chamfer similarity scores (shape: [num_queries, num_indices])
             )doc")
 
       .def(
@@ -334,21 +374,42 @@ PYBIND11_MODULE(chamfer, m) {
       .def(
           "batch_query_subset_fixed",
           [](const Chamfer &self, py::array_t<float> queries, int k,
-             const std::vector<int> &indices) {
+             py::array_t<int> indices) {
             py::buffer_info queries_buf = queries.request();
+            py::buffer_info indices_buf = indices.request();
 
             if (queries_buf.ndim != 3) {
               throw std::runtime_error(
                   "queries must be a 3-dimensional array (num_queries, "
                   "query_vec_count, vec_dim)");
             }
+            if (indices_buf.ndim != 2) {
+              throw std::runtime_error("indices must be a 2-dimensional array "
+                                       "(num_queries, num_indices)");
+            }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
+            const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = queries_buf.shape[0];
             int query_vec_count = queries_buf.shape[1];
+            int num_indices = indices_buf.shape[1];
 
-            return self.batch_query_subset_fixed(queries_ptr, num_queries,
-                                                 query_vec_count, k, indices);
+            auto results = self.batch_query_subset_fixed(
+                queries_ptr, num_queries, query_vec_count, k, indices_ptr,
+                num_indices);
+
+            // Convert to 2D numpy array
+            py::array_t<int> result_array({num_queries, k});
+            auto result_buf = result_array.request();
+            int *result_ptr = static_cast<int *>(result_buf.ptr);
+
+            for (int i = 0; i < num_queries; i++) {
+              for (int j = 0; j < k; j++) {
+                result_ptr[i * k + j] = results[i][j];
+              }
+            }
+
+            return result_array;
           },
           py::arg("queries"), py::arg("k"), py::arg("indices"),
           R"doc(
@@ -361,33 +422,54 @@ PYBIND11_MODULE(chamfer, m) {
                     All queries have the same number of vectors.
                 k : int
                     Number of nearest neighbors to return per query
-                indices : list of int
-                    Subset of training point indices to search
+                indices : numpy.ndarray
+                    2D array of indices to search for each query (shape: [num_queries, num_indices])
 
                 Returns
                 -------
-                list of list of int
-                    For each query, indices of k nearest neighbors from the subset
+                numpy.ndarray
+                    2D array of nearest neighbor indices (shape: [num_queries, k])
             )doc")
 
       .def(
           "batch_distance_to_indices_fixed",
           [](const Chamfer &self, py::array_t<float> queries,
-             const std::vector<int> &indices) {
+             py::array_t<int> indices) {
             py::buffer_info queries_buf = queries.request();
+            py::buffer_info indices_buf = indices.request();
 
             if (queries_buf.ndim != 3) {
               throw std::runtime_error(
                   "queries must be a 3-dimensional array (num_queries, "
                   "query_vec_count, vec_dim)");
             }
+            if (indices_buf.ndim != 2) {
+              throw std::runtime_error("indices must be a 2-dimensional array "
+                                       "(num_queries, num_indices)");
+            }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
+            const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = queries_buf.shape[0];
             int query_vec_count = queries_buf.shape[1];
+            int num_indices = indices_buf.shape[1];
 
-            return self.batch_distance_to_indices_fixed(
-                queries_ptr, num_queries, query_vec_count, indices);
+            auto results = self.batch_distance_to_indices_fixed(
+                queries_ptr, num_queries, query_vec_count, indices_ptr,
+                num_indices);
+
+            // Convert to 2D numpy array
+            py::array_t<float> result_array({num_queries, num_indices});
+            auto result_buf = result_array.request();
+            float *result_ptr = static_cast<float *>(result_buf.ptr);
+
+            for (int i = 0; i < num_queries; i++) {
+              for (int j = 0; j < num_indices; j++) {
+                result_ptr[i * num_indices + j] = results[i][j];
+              }
+            }
+
+            return result_array;
           },
           py::arg("queries"), py::arg("indices"),
           R"doc(
@@ -398,12 +480,12 @@ PYBIND11_MODULE(chamfer, m) {
                 queries : numpy.ndarray
                     3D array of query vectors (shape: [num_queries, query_vec_count, vec_dim])
                     All queries have the same number of vectors.
-                indices : list of int
-                    Training point indices to compute distances to
+                indices : numpy.ndarray
+                    2D array of indices to compute distances for each query (shape: [num_queries, num_indices])
 
                 Returns
                 -------
-                list of list of float
-                    For each query, Chamfer similarity scores to the specified indices
+                numpy.ndarray
+                    2D array of Chamfer similarity scores (shape: [num_queries, num_indices])
             )doc");
 }
