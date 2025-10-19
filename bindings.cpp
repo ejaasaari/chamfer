@@ -225,6 +225,14 @@ PYBIND11_MODULE(chamfer, m) {
                                        "(num_queries, num_indices)");
             }
 
+            bool indices_contiguous =
+                indices_buf.strides[1] == sizeof(int) &&
+                indices_buf.strides[0] == indices_buf.shape[1] * sizeof(int);
+            if (!indices_contiguous) {
+              throw std::runtime_error(
+                  "indices array must be C-contiguous (use np.ascontiguousarray)");
+            }
+
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
             const int32_t *counts_ptr = static_cast<int32_t *>(counts_buf.ptr);
             const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
@@ -294,6 +302,14 @@ PYBIND11_MODULE(chamfer, m) {
                                        "(num_queries, num_indices)");
             }
 
+            bool indices_contiguous =
+                indices_buf.strides[1] == sizeof(int) &&
+                indices_buf.strides[0] == indices_buf.shape[1] * sizeof(int);
+            if (!indices_contiguous) {
+              throw std::runtime_error(
+                  "indices array must be C-contiguous (use np.ascontiguousarray)");
+            }
+
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
             const int32_t *counts_ptr = static_cast<int32_t *>(counts_buf.ptr);
             const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
@@ -346,6 +362,15 @@ PYBIND11_MODULE(chamfer, m) {
                   "query_vec_count, vec_dim)");
             }
 
+            bool queries_contiguous =
+                queries_buf.strides[2] == sizeof(float) &&
+                queries_buf.strides[1] == queries_buf.shape[2] * sizeof(float) &&
+                queries_buf.strides[0] == queries_buf.shape[1] * queries_buf.shape[2] * sizeof(float);
+            if (!queries_contiguous) {
+              throw std::runtime_error(
+                  "queries array must be C-contiguous (use np.ascontiguousarray)");
+            }
+
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
             int num_queries = queries_buf.shape[0];
             int query_vec_count = queries_buf.shape[1];
@@ -388,13 +413,21 @@ PYBIND11_MODULE(chamfer, m) {
                                        "(num_queries, num_indices)");
             }
 
-            if (!queries_buf.flags_c_contiguous()) {
-              throw std::runtime_error("queries array must be C-contiguous "
-                                       "(use np.ascontiguousarray)");
+            bool queries_contiguous =
+                queries_buf.strides[2] == sizeof(float) &&
+                queries_buf.strides[1] == queries_buf.shape[2] * sizeof(float) &&
+                queries_buf.strides[0] == queries_buf.shape[1] * queries_buf.shape[2] * sizeof(float);
+            if (!queries_contiguous) {
+              throw std::runtime_error(
+                  "queries array must be C-contiguous (use np.ascontiguousarray)");
             }
-            if (!indices_buf.flags_c_contiguous()) {
-              throw std::runtime_error("indices array must be C-contiguous "
-                                       "(use np.ascontiguousarray)");
+
+            bool indices_contiguous =
+                indices_buf.strides[1] == sizeof(int) &&
+                indices_buf.strides[0] == indices_buf.shape[1] * sizeof(int);
+            if (!indices_contiguous) {
+              throw std::runtime_error(
+                  "indices array must be C-contiguous (use np.ascontiguousarray)");
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
@@ -459,6 +492,23 @@ PYBIND11_MODULE(chamfer, m) {
             if (indices_buf.ndim != 2) {
               throw std::runtime_error("indices must be a 2-dimensional array "
                                        "(num_queries, num_indices)");
+            }
+
+            bool queries_contiguous =
+                queries_buf.strides[2] == sizeof(float) &&
+                queries_buf.strides[1] == queries_buf.shape[2] * sizeof(float) &&
+                queries_buf.strides[0] == queries_buf.shape[1] * queries_buf.shape[2] * sizeof(float);
+            if (!queries_contiguous) {
+              throw std::runtime_error(
+                  "queries array must be C-contiguous (use np.ascontiguousarray)");
+            }
+
+            bool indices_contiguous =
+                indices_buf.strides[1] == sizeof(int) &&
+                indices_buf.strides[0] == indices_buf.shape[1] * sizeof(int);
+            if (!indices_contiguous) {
+              throw std::runtime_error(
+                  "indices array must be C-contiguous (use np.ascontiguousarray)");
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
