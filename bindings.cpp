@@ -10,12 +10,13 @@ PYBIND11_MODULE(chamfer, m) {
 
   py::class_<Chamfer>(m, "Chamfer")
       .def(py::init([](py::array_t<float> train,
-                       py::array_t<uint32_t> train_counts, int vec_dim) {
+                       py::array_t<uint32_t> train_counts) {
              py::buffer_info train_buf = train.request();
              py::buffer_info counts_buf = train_counts.request();
 
-             if (train_buf.ndim != 1) {
-               throw std::runtime_error("train must be a 1-dimensional array");
+             if (train_buf.ndim != 2) {
+               throw std::runtime_error("train must be a 2-dimensional array "
+                                        "(total_vectors, vec_dim)");
              }
              if (counts_buf.ndim != 1) {
                throw std::runtime_error(
@@ -26,46 +27,44 @@ PYBIND11_MODULE(chamfer, m) {
              const uint32_t *counts_ptr =
                  static_cast<uint32_t *>(counts_buf.ptr);
              int num_train_points = counts_buf.shape[0];
+             int vec_dim = train_buf.shape[1];
 
              return new Chamfer(train_ptr, counts_ptr, vec_dim,
                                 num_train_points);
            }),
-           py::arg("train"), py::arg("train_counts"), py::arg("vec_dim"),
+           py::arg("train"), py::arg("train_counts"),
            R"doc(
             Initialize Chamfer index with training data.
 
             Parameters
             ----------
             train : numpy.ndarray
-                Flattened array of training vectors (shape: [total_vectors * vec_dim])
+                2D array of training vectors (shape: [total_vectors, vec_dim])
             train_counts : numpy.ndarray
                 Number of vectors per training point (shape: [num_train_points])
-            vec_dim : int
-                Dimensionality of each vector
         )doc")
 
       .def(
           "compute_chamfer_similarity",
-          [](const Chamfer &self, py::array_t<float> q, uint32_t count,
-             int train_point_idx) {
+          [](const Chamfer &self, py::array_t<float> q, int train_point_idx) {
             py::buffer_info q_buf = q.request();
-            if (q_buf.ndim != 1) {
-              throw std::runtime_error("query must be a 1-dimensional array");
+            if (q_buf.ndim != 2) {
+              throw std::runtime_error(
+                  "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
+            uint32_t count = q_buf.shape[0];
             return self.compute_chamfer_similarity(q_ptr, count,
                                                    train_point_idx);
           },
-          py::arg("q"), py::arg("count"), py::arg("train_point_idx"),
+          py::arg("q"), py::arg("train_point_idx"),
           R"doc(
                 Compute Chamfer similarity between a query and a specific training point.
 
                 Parameters
                 ----------
                 q : numpy.ndarray
-                    Flattened query vectors (shape: [count * vec_dim])
-                count : int
-                    Number of vectors in the query
+                    2D array of query vectors (shape: [num_vectors, vec_dim])
                 train_point_idx : int
                     Index of the training point to compare against
 
@@ -77,25 +76,25 @@ PYBIND11_MODULE(chamfer, m) {
 
       .def(
           "distance_to_indices",
-          [](const Chamfer &self, py::array_t<float> q, uint32_t count,
+          [](const Chamfer &self, py::array_t<float> q,
              const std::vector<int> &indices) {
             py::buffer_info q_buf = q.request();
-            if (q_buf.ndim != 1) {
-              throw std::runtime_error("query must be a 1-dimensional array");
+            if (q_buf.ndim != 2) {
+              throw std::runtime_error(
+                  "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
+            uint32_t count = q_buf.shape[0];
             return self.distance_to_indices(q_ptr, count, indices);
           },
-          py::arg("q"), py::arg("count"), py::arg("indices"),
+          py::arg("q"), py::arg("indices"),
           R"doc(
                 Compute Chamfer distances to specific training point indices.
 
                 Parameters
                 ----------
                 q : numpy.ndarray
-                    Flattened query vectors (shape: [count * vec_dim])
-                count : int
-                    Number of vectors in the query
+                    2D array of query vectors (shape: [num_vectors, vec_dim])
                 indices : list of int
                     Indices of training points to compute distances to
 
@@ -107,25 +106,25 @@ PYBIND11_MODULE(chamfer, m) {
 
       .def(
           "query_subset",
-          [](const Chamfer &self, py::array_t<float> q, uint32_t count, int k,
+          [](const Chamfer &self, py::array_t<float> q, int k,
              const std::vector<int> &indices) {
             py::buffer_info q_buf = q.request();
-            if (q_buf.ndim != 1) {
-              throw std::runtime_error("query must be a 1-dimensional array");
+            if (q_buf.ndim != 2) {
+              throw std::runtime_error(
+                  "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
+            uint32_t count = q_buf.shape[0];
             return self.query_subset(q_ptr, count, k, indices);
           },
-          py::arg("q"), py::arg("count"), py::arg("k"), py::arg("indices"),
+          py::arg("q"), py::arg("k"), py::arg("indices"),
           R"doc(
                 Find k nearest neighbors from a subset of training points.
 
                 Parameters
                 ----------
                 q : numpy.ndarray
-                    Flattened query vectors (shape: [count * vec_dim])
-                count : int
-                    Number of vectors in the query
+                    2D array of query vectors (shape: [num_vectors, vec_dim])
                 k : int
                     Number of nearest neighbors to return
                 indices : list of int
@@ -139,24 +138,24 @@ PYBIND11_MODULE(chamfer, m) {
 
       .def(
           "query",
-          [](const Chamfer &self, py::array_t<float> q, uint32_t count, int k) {
+          [](const Chamfer &self, py::array_t<float> q, int k) {
             py::buffer_info q_buf = q.request();
-            if (q_buf.ndim != 1) {
-              throw std::runtime_error("query must be a 1-dimensional array");
+            if (q_buf.ndim != 2) {
+              throw std::runtime_error(
+                  "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
+            uint32_t count = q_buf.shape[0];
             return self.query(q_ptr, count, k);
           },
-          py::arg("q"), py::arg("count"), py::arg("k"),
+          py::arg("q"), py::arg("k"),
           R"doc(
                 Find k nearest neighbors from all training points.
 
                 Parameters
                 ----------
                 q : numpy.ndarray
-                    Flattened query vectors (shape: [count * vec_dim])
-                count : int
-                    Number of vectors in the query
+                    2D array of query vectors (shape: [num_vectors, vec_dim])
                 k : int
                     Number of nearest neighbors to return
 
