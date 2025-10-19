@@ -10,7 +10,7 @@ PYBIND11_MODULE(chamfer, m) {
 
   py::class_<Chamfer>(m, "Chamfer")
       .def(py::init([](py::array_t<float> train,
-                       py::array_t<uint32_t> train_counts) {
+                       py::array_t<int32_t> train_counts) {
              py::buffer_info train_buf = train.request();
              py::buffer_info counts_buf = train_counts.request();
 
@@ -24,8 +24,8 @@ PYBIND11_MODULE(chamfer, m) {
              }
 
              const float *train_ptr = static_cast<float *>(train_buf.ptr);
-             const uint32_t *counts_ptr =
-                 static_cast<uint32_t *>(counts_buf.ptr);
+             const int32_t *counts_ptr =
+                 static_cast<int32_t *>(counts_buf.ptr);
              int num_train_points = counts_buf.shape[0];
              int vec_dim = train_buf.shape[1];
 
@@ -53,7 +53,7 @@ PYBIND11_MODULE(chamfer, m) {
                   "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
-            uint32_t count = q_buf.shape[0];
+            int32_t count = q_buf.shape[0];
             return self.compute_chamfer_similarity(q_ptr, count,
                                                    train_point_idx);
           },
@@ -84,7 +84,7 @@ PYBIND11_MODULE(chamfer, m) {
                   "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
-            uint32_t count = q_buf.shape[0];
+            int32_t count = q_buf.shape[0];
             return self.distance_to_indices(q_ptr, count, indices);
           },
           py::arg("q"), py::arg("indices"),
@@ -114,7 +114,7 @@ PYBIND11_MODULE(chamfer, m) {
                   "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
-            uint32_t count = q_buf.shape[0];
+            int32_t count = q_buf.shape[0];
             return self.query_subset(q_ptr, count, k, indices);
           },
           py::arg("q"), py::arg("k"), py::arg("indices"),
@@ -145,7 +145,7 @@ PYBIND11_MODULE(chamfer, m) {
                   "query must be a 2-dimensional array (num_vectors, vec_dim)");
             }
             const float *q_ptr = static_cast<float *>(q_buf.ptr);
-            uint32_t count = q_buf.shape[0];
+            int32_t count = q_buf.shape[0];
             return self.query(q_ptr, count, k);
           },
           py::arg("q"), py::arg("k"),
@@ -168,7 +168,7 @@ PYBIND11_MODULE(chamfer, m) {
       .def(
           "batch_query",
           [](const Chamfer &self, py::array_t<float> queries,
-             py::array_t<uint32_t> query_counts, int k) {
+             py::array_t<int32_t> query_counts, int k) {
             py::buffer_info queries_buf = queries.request();
             py::buffer_info counts_buf = query_counts.request();
 
@@ -181,8 +181,8 @@ PYBIND11_MODULE(chamfer, m) {
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
-            const uint32_t *counts_ptr =
-                static_cast<uint32_t *>(counts_buf.ptr);
+            const int32_t *counts_ptr =
+                static_cast<int32_t *>(counts_buf.ptr);
             int num_queries = counts_buf.shape[0];
 
             return self.batch_query(queries_ptr, counts_ptr, num_queries, k);
@@ -209,7 +209,7 @@ PYBIND11_MODULE(chamfer, m) {
       .def(
           "batch_query_subset",
           [](const Chamfer &self, py::array_t<float> queries,
-             py::array_t<uint32_t> query_counts, int k,
+             py::array_t<int32_t> query_counts, int k,
              py::array_t<int> indices) {
             py::buffer_info queries_buf = queries.request();
             py::buffer_info counts_buf = query_counts.request();
@@ -228,8 +228,8 @@ PYBIND11_MODULE(chamfer, m) {
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
-            const uint32_t *counts_ptr =
-                static_cast<uint32_t *>(counts_buf.ptr);
+            const int32_t *counts_ptr =
+                static_cast<int32_t *>(counts_buf.ptr);
             const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = counts_buf.shape[0];
             int num_indices = indices_buf.shape[1];
@@ -276,7 +276,7 @@ PYBIND11_MODULE(chamfer, m) {
       .def(
           "batch_distance_to_indices",
           [](const Chamfer &self, py::array_t<float> queries,
-             py::array_t<uint32_t> query_counts, py::array_t<int> indices) {
+             py::array_t<int32_t> query_counts, py::array_t<int> indices) {
             py::buffer_info queries_buf = queries.request();
             py::buffer_info counts_buf = query_counts.request();
             py::buffer_info indices_buf = indices.request();
@@ -294,8 +294,8 @@ PYBIND11_MODULE(chamfer, m) {
             }
 
             const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
-            const uint32_t *counts_ptr =
-                static_cast<uint32_t *>(counts_buf.ptr);
+            const int32_t *counts_ptr =
+                static_cast<int32_t *>(counts_buf.ptr);
             const int *indices_ptr = static_cast<int *>(indices_buf.ptr);
             int num_queries = counts_buf.shape[0];
             int num_indices = indices_buf.shape[1];

@@ -25,40 +25,40 @@
 class Chamfer {
 private:
   const float *train;
-  const uint32_t *train_counts;
+  const int32_t *train_counts;
   int vec_dim;
   int num_train_points;
-  std::vector<uint32_t> train_offsets;
+  std::vector<int32_t> train_offsets;
 
 public:
-  Chamfer(const float *train, const uint32_t *train_counts, int vec_dim,
+  Chamfer(const float *train, const int32_t *train_counts, int vec_dim,
           int num_train_points)
       : train(train), train_counts(train_counts), vec_dim(vec_dim),
         num_train_points(num_train_points) {
 
     train_offsets.resize(num_train_points);
-    uint32_t offset = 0;
+    int32_t offset = 0;
     for (int i = 0; i < num_train_points; i++) {
       train_offsets[i] = offset;
       offset += train_counts[i];
     }
   }
 
-  float compute_chamfer_similarity(const float *q, uint32_t count,
+  float compute_chamfer_similarity(const float *q, int32_t count,
                                    int train_point_idx) const {
-    const uint32_t train_offset = train_offsets[train_point_idx];
-    const uint32_t train_count = train_counts[train_point_idx];
+    const int32_t train_offset = train_offsets[train_point_idx];
+    const int32_t train_count = train_counts[train_point_idx];
 
     alignas(64) float max_buf_static[64];
     float *max_dot = (count <= 64) ? max_buf_static : new float[count];
-    for (uint32_t i = 0; i < count; ++i)
+    for (int32_t i = 0; i < count; ++i)
       max_dot[i] = -std::numeric_limits<float>::infinity();
 
-    for (uint32_t j = 0; j < train_count; ++j) {
+    for (int32_t j = 0; j < train_count; ++j) {
       const float *tj = train + (train_offset + j) * vec_dim;
 
 #if defined(__AVX512F__)
-      uint32_t i = 0;
+      int32_t i = 0;
       for (; i + 7 < count; i += 8) {
         __m512 acc0 = _mm512_setzero_ps();
         __m512 acc1 = _mm512_setzero_ps();
@@ -173,7 +173,7 @@ public:
       }
 
 #else
-      for (uint32_t i = 0; i < count; ++i) {
+      for (int32_t i = 0; i < count; ++i) {
         const float *qi = q + i * vec_dim;
         float a0 = 0.f, a1 = 0.f, a2 = 0.f, a3 = 0.f;
         int k = 0;
@@ -193,7 +193,7 @@ public:
     }
 
     float similarity = 0.0f;
-    for (uint32_t i = 0; i < count; ++i)
+    for (int32_t i = 0; i < count; ++i)
       similarity += max_dot[i];
 
     if (max_dot != max_buf_static)
@@ -202,7 +202,7 @@ public:
   }
 
   std::vector<float>
-  distance_to_indices(const float *q, uint32_t count,
+  distance_to_indices(const float *q, int32_t count,
                       const std::vector<int> &indices) const {
     std::vector<float> distances;
     distances.reserve(indices.size());
@@ -215,7 +215,7 @@ public:
     return distances;
   }
 
-  std::vector<int> query_subset(const float *q, uint32_t count, int k,
+  std::vector<int> query_subset(const float *q, int32_t count, int k,
                                 const std::vector<int> &indices) const {
     std::vector<float> distances = distance_to_indices(q, count, indices);
 
@@ -242,7 +242,7 @@ public:
     return result;
   }
 
-  std::vector<int> query(const float *q, uint32_t count, int k) const {
+  std::vector<int> query(const float *q, int32_t count, int k) const {
     std::vector<int> all_indices(num_train_points);
     for (int i = 0; i < num_train_points; i++) {
       all_indices[i] = i;
@@ -251,15 +251,15 @@ public:
   }
 
   std::vector<std::vector<int>> batch_query(const float *queries,
-                                            const uint32_t *query_counts,
+                                            const int32_t *query_counts,
                                             int num_queries, int k) const {
     std::vector<std::vector<int>> results;
     results.reserve(num_queries);
 
-    uint32_t offset = 0;
+    int32_t offset = 0;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + offset;
-      uint32_t count = query_counts[i];
+      int32_t count = query_counts[i];
       results.push_back(query(q, count, k));
       offset += count * vec_dim;
     }
@@ -268,17 +268,17 @@ public:
   }
 
   std::vector<std::vector<int>> batch_query_subset(const float *queries,
-                                                   const uint32_t *query_counts,
+                                                   const int32_t *query_counts,
                                                    int num_queries, int k,
                                                    const int *indices_matrix,
                                                    int num_indices) const {
     std::vector<std::vector<int>> results;
     results.reserve(num_queries);
 
-    uint32_t offset = 0;
+    int32_t offset = 0;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + offset;
-      uint32_t count = query_counts[i];
+      int32_t count = query_counts[i];
 
       std::vector<int> query_indices(num_indices);
       for (int j = 0; j < num_indices; j++) {
@@ -293,16 +293,16 @@ public:
   }
 
   std::vector<std::vector<float>>
-  batch_distance_to_indices(const float *queries, const uint32_t *query_counts,
+  batch_distance_to_indices(const float *queries, const int32_t *query_counts,
                             int num_queries, const int *indices_matrix,
                             int num_indices) const {
     std::vector<std::vector<float>> results;
     results.reserve(num_queries);
 
-    uint32_t offset = 0;
+    int32_t offset = 0;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + offset;
-      uint32_t count = query_counts[i];
+      int32_t count = query_counts[i];
 
       std::vector<int> query_indices(num_indices);
       for (int j = 0; j < num_indices; j++) {
@@ -318,12 +318,12 @@ public:
 
   std::vector<std::vector<int>> batch_query_fixed(const float *queries,
                                                   int num_queries,
-                                                  uint32_t query_vec_count,
+                                                  int32_t query_vec_count,
                                                   int k) const {
     std::vector<std::vector<int>> results;
     results.reserve(num_queries);
 
-    uint32_t stride = query_vec_count * vec_dim;
+    int32_t stride = query_vec_count * vec_dim;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
       results.push_back(query(q, query_vec_count, k));
@@ -334,12 +334,12 @@ public:
 
   std::vector<std::vector<int>>
   batch_query_subset_fixed(const float *queries, int num_queries,
-                           uint32_t query_vec_count, int k,
+                           int32_t query_vec_count, int k,
                            const int *indices_matrix, int num_indices) const {
     std::vector<std::vector<int>> results;
     results.reserve(num_queries);
 
-    uint32_t stride = query_vec_count * vec_dim;
+    int32_t stride = query_vec_count * vec_dim;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
 
@@ -355,12 +355,12 @@ public:
   }
 
   std::vector<std::vector<float>> batch_distance_to_indices_fixed(
-      const float *queries, int num_queries, uint32_t query_vec_count,
+      const float *queries, int num_queries, int32_t query_vec_count,
       const int *indices_matrix, int num_indices) const {
     std::vector<std::vector<float>> results;
     results.reserve(num_queries);
 
-    uint32_t stride = query_vec_count * vec_dim;
+    int32_t stride = query_vec_count * vec_dim;
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
 
