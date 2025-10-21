@@ -98,6 +98,31 @@ def native_flags(compiler):
     return flags[c].get(a, defaults[c])
 
 
+def macos_openmp_flags(is_clang, is_apple_clang):
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix and Path(conda_prefix, "lib", "libomp.dylib").exists():
+        prefix = Path(conda_prefix)
+    else:
+        prefix = Path("/opt/homebrew/opt/libomp")
+
+    include_dir = prefix / "include"
+    lib_dir = prefix / "lib"
+
+    if is_clang:
+        if is_apple_clang:
+            opts = ["-Xpreprocessor", "-fopenmp", f"-I{include_dir}"]
+            link_opts = [f"-L{lib_dir}", "-lomp", f"-Wl,-rpath,{lib_dir}"]
+            return opts, link_opts
+        else:
+            opts = ["-fopenmp", f"-I{include_dir}"]
+            link_opts = [f"-L{lib_dir}", "-fopenmp", "-lomp", f"-Wl,-rpath,{lib_dir}"]
+            return opts, link_opts
+
+    opts = ["-fopenmp", f"-I{include_dir}"]
+    link_opts = [f"-L{lib_dir}", "-fopenmp", f"-Wl,-rpath,{lib_dir}"]
+    return opts, link_opts
+
+
 class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options.
 
@@ -125,8 +150,8 @@ class BuildExt(build_ext):
 
     def build_extensions(self):
         ct = self.compiler.compiler_type
-        opts = self.c_opts.get(ct, [])
-        link_opts = self.link_opts.get(ct, [])
+        opts = list(self.c_opts.get(ct, []))
+        link_opts = list(self.link_opts.get(ct, []))
 
         if ct == "unix":
             opts.extend(
@@ -154,6 +179,19 @@ class BuildExt(build_ext):
                 if is_clang and has_flag(self.compiler, "-stdlib=libc++"):
                     opts.append("-stdlib=libc++")
                     link_opts.append("-stdlib=libc++")
+
+                omp_compile, omp_link = macos_openmp_flags(is_clang, is_apple_clang)
+                opts.extend(omp_compile)
+                link_opts.extend(omp_link)
+            else:
+                if has_flag(self.compiler, "-fopenmp"):
+                    opts.append("-fopenmp")
+                    link_opts.append("-fopenmp")
+                    if is_clang:
+                        link_opts.append("-lomp")
+
+        elif ct == "msvc":
+            opts.append("/openmp")
 
         import numpy as np
 

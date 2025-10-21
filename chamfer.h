@@ -6,6 +6,9 @@
 #include <iostream>
 #include <limits>
 #include <vector>
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
 #include <arm_neon.h>
@@ -378,5 +381,37 @@ public:
     }
 
     return results;
+  }
+
+  std::vector<std::vector<float>> pairwise_similarities() const {
+    std::vector<std::vector<float>> similarities(
+        num_train_points, std::vector<float>(num_train_points, 0.0f));
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < num_train_points; ++i) {
+      std::cout << i << std::endl;
+      int64_t offset = static_cast<int64_t>(train_offsets[i]) * vec_dim;
+      const float *query = train + offset;
+      int32_t query_count = train_counts[i];
+      auto &row = similarities[i];
+      for (int j = 0; j < num_train_points; ++j) {
+        row[j] = compute_chamfer_similarity(query, query_count, j);
+      }
+    }
+#else
+    for (int i = 0; i < num_train_points; ++i) {
+      std::cout << i << std::endl;
+      int64_t offset = static_cast<int64_t>(train_offsets[i]) * vec_dim;
+      const float *query = train + offset;
+      int32_t query_count = train_counts[i];
+      auto &row = similarities[i];
+      for (int j = 0; j < num_train_points; ++j) {
+        row[j] = compute_chamfer_similarity(query, query_count, j);
+      }
+    }
+#endif
+
+    return similarities;
   }
 };

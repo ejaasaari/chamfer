@@ -550,5 +550,34 @@ PYBIND11_MODULE(chamfer, m) {
                 -------
                 numpy.ndarray
                     2D array of Chamfer similarity scores (shape: [num_queries, num_indices])
+            )doc")
+
+      .def(
+          "pairwise_similarities",
+          [](const Chamfer &self) {
+            auto similarities = self.pairwise_similarities();
+            int num_points = static_cast<int>(similarities.size());
+
+            py::array_t<float> result_array({num_points, num_points});
+            auto result_buf = result_array.request();
+            float *result_ptr = static_cast<float *>(result_buf.ptr);
+
+            for (int i = 0; i < num_points; ++i) {
+              const auto &row = similarities[i];
+              for (int j = 0; j < num_points; ++j) {
+                result_ptr[i * num_points + j] = row[j];
+              }
+            }
+
+            return result_array;
+          },
+          R"doc(
+                Compute the Chamfer similarities between every pair of training points.
+
+                Returns
+                -------
+                numpy.ndarray
+                    2D array of size (num_train_points, num_train_points) where entry [i, j]
+                    is the similarity from training point i to training point j.
             )doc");
 }
