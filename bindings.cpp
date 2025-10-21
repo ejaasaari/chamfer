@@ -578,6 +578,6 @@ PYBIND11_MODULE(chamfer, m) {
                 -------
                 numpy.ndarray
                     2D array of size (num_train_points, num_train_points) where entry [i, j]
-                    is the similarity from training point i to training point j.
+                    equals chamfer(i -> j) / train_counts[i] + chamfer(j -> i) / train_counts[j].
             )doc");
 }
