@@ -223,6 +223,16 @@ public:
     return distances;
   }
 
+  std::vector<float> distance_to_points(const float *q,
+                                        int32_t count) const {
+    std::vector<int> all_indices(num_train_points);
+    for (int i = 0; i < num_train_points; ++i)
+      all_indices[i] = i;
+    return distance_to_indices(q, count, all_indices);
+  }
+
+  int train_point_count() const { return num_train_points; }
+
   std::vector<int> query_subset(const float *q, int32_t count, int k,
                                 const std::vector<int> &indices) const {
     std::vector<float> distances = distance_to_indices(q, count, indices);
@@ -261,15 +271,22 @@ public:
   std::vector<std::vector<int>> batch_query(const float *queries,
                                             const int32_t *query_counts,
                                             int num_queries, int k) const {
-    std::vector<std::vector<int>> results;
-    results.reserve(num_queries);
+    std::vector<std::vector<int>> results(num_queries);
+    std::vector<int32_t> offsets(num_queries, 0);
 
     int32_t offset = 0;
     for (int i = 0; i < num_queries; i++) {
-      const float *q = queries + offset;
+      offsets[i] = offset;
+      offset += query_counts[i] * vec_dim;
+    }
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (int i = 0; i < num_queries; i++) {
+      const float *q = queries + offsets[i];
       int32_t count = query_counts[i];
-      results.push_back(query(q, count, k));
-      offset += count * vec_dim;
+      results[i] = query(q, count, k);
     }
 
     return results;
@@ -280,12 +297,20 @@ public:
                                                    int num_queries, int k,
                                                    const int *indices_matrix,
                                                    int num_indices) const {
-    std::vector<std::vector<int>> results;
-    results.reserve(num_queries);
+    std::vector<std::vector<int>> results(num_queries);
+    std::vector<int32_t> offsets(num_queries, 0);
 
     int32_t offset = 0;
     for (int i = 0; i < num_queries; i++) {
-      const float *q = queries + offset;
+      offsets[i] = offset;
+      offset += query_counts[i] * vec_dim;
+    }
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (int i = 0; i < num_queries; i++) {
+      const float *q = queries + offsets[i];
       int32_t count = query_counts[i];
 
       std::vector<int> query_indices(num_indices);
@@ -293,8 +318,7 @@ public:
         query_indices[j] = indices_matrix[i * num_indices + j];
       }
 
-      results.push_back(query_subset(q, count, k, query_indices));
-      offset += count * vec_dim;
+      results[i] = query_subset(q, count, k, query_indices);
     }
 
     return results;
@@ -304,12 +328,20 @@ public:
   batch_distance_to_indices(const float *queries, const int32_t *query_counts,
                             int num_queries, const int *indices_matrix,
                             int num_indices) const {
-    std::vector<std::vector<float>> results;
-    results.reserve(num_queries);
+    std::vector<std::vector<float>> results(num_queries);
+    std::vector<int32_t> offsets(num_queries, 0);
 
     int32_t offset = 0;
     for (int i = 0; i < num_queries; i++) {
-      const float *q = queries + offset;
+      offsets[i] = offset;
+      offset += query_counts[i] * vec_dim;
+    }
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (int i = 0; i < num_queries; i++) {
+      const float *q = queries + offsets[i];
       int32_t count = query_counts[i];
 
       std::vector<int> query_indices(num_indices);
@@ -317,8 +349,31 @@ public:
         query_indices[j] = indices_matrix[i * num_indices + j];
       }
 
-      results.push_back(distance_to_indices(q, count, query_indices));
-      offset += count * vec_dim;
+      results[i] = distance_to_indices(q, count, query_indices);
+    }
+
+    return results;
+  }
+
+  std::vector<std::vector<float>>
+  batch_distance_to_points(const float *queries, const int32_t *query_counts,
+                           int num_queries) const {
+    std::vector<std::vector<float>> results(num_queries);
+    std::vector<int32_t> offsets(num_queries, 0);
+
+    int32_t offset = 0;
+    for (int i = 0; i < num_queries; i++) {
+      offsets[i] = offset;
+      offset += query_counts[i] * vec_dim;
+    }
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (int i = 0; i < num_queries; i++) {
+      const float *q = queries + offsets[i];
+      int32_t count = query_counts[i];
+      results[i] = distance_to_points(q, count);
     }
 
     return results;
@@ -328,13 +383,15 @@ public:
                                                   int num_queries,
                                                   int32_t query_vec_count,
                                                   int k) const {
-    std::vector<std::vector<int>> results;
-    results.reserve(num_queries);
-
+    std::vector<std::vector<int>> results(num_queries);
     int32_t stride = query_vec_count * vec_dim;
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
-      results.push_back(query(q, query_vec_count, k));
+      results[i] = query(q, query_vec_count, k);
     }
 
     return results;
@@ -344,10 +401,12 @@ public:
   batch_query_subset_fixed(const float *queries, int num_queries,
                            int32_t query_vec_count, int k,
                            const int *indices_matrix, int num_indices) const {
-    std::vector<std::vector<int>> results;
-    results.reserve(num_queries);
-
+    std::vector<std::vector<int>> results(num_queries);
     int32_t stride = query_vec_count * vec_dim;
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
 
@@ -356,7 +415,7 @@ public:
         query_indices[j] = indices_matrix[i * num_indices + j];
       }
 
-      results.push_back(query_subset(q, query_vec_count, k, query_indices));
+      results[i] = query_subset(q, query_vec_count, k, query_indices);
     }
 
     return results;
@@ -365,10 +424,12 @@ public:
   std::vector<std::vector<float>> batch_distance_to_indices_fixed(
       const float *queries, int num_queries, int32_t query_vec_count,
       const int *indices_matrix, int num_indices) const {
-    std::vector<std::vector<float>> results;
-    results.reserve(num_queries);
-
+    std::vector<std::vector<float>> results(num_queries);
     int32_t stride = query_vec_count * vec_dim;
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
     for (int i = 0; i < num_queries; i++) {
       const float *q = queries + i * stride;
 
@@ -377,7 +438,23 @@ public:
         query_indices[j] = indices_matrix[i * num_indices + j];
       }
 
-      results.push_back(distance_to_indices(q, query_vec_count, query_indices));
+      results[i] = distance_to_indices(q, query_vec_count, query_indices);
+    }
+
+    return results;
+  }
+
+  std::vector<std::vector<float>> batch_distance_to_points_fixed(
+      const float *queries, int num_queries, int32_t query_vec_count) const {
+    std::vector<std::vector<float>> results(num_queries);
+    int32_t stride = query_vec_count * vec_dim;
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (int i = 0; i < num_queries; i++) {
+      const float *q = queries + i * stride;
+      results[i] = distance_to_points(q, query_vec_count);
     }
 
     return results;
