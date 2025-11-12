@@ -460,6 +460,41 @@ public:
     return results;
   }
 
+  std::vector<std::vector<float>> pairwise_similarities_to_train(
+      const float *queries, const int32_t *query_counts,
+      int num_queries) const {
+    std::vector<std::vector<float>> results(num_queries);
+    std::vector<int64_t> offsets(num_queries, 0);
+
+    int64_t offset = 0;
+    for (int i = 0; i < num_queries; ++i) {
+      int32_t count = query_counts[i];
+      if (count <= 0) {
+        throw std::runtime_error(
+            "query_counts must be positive to compute similarities");
+      }
+      offsets[i] = offset;
+      offset += static_cast<int64_t>(count) * vec_dim;
+    }
+
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (int i = 0; i < num_queries; ++i) {
+      std::cout << i << std::endl;
+      const float *query = queries + offsets[i];
+      int32_t query_count = query_counts[i];
+
+      auto &row = results[i];
+      row.resize(num_train_points);
+      for (int j = 0; j < num_train_points; ++j) {
+        row[j] = compute_chamfer_similarity(query, query_count, j);
+      }
+    }
+
+    return results;
+  }
+
   std::vector<std::vector<float>> pairwise_similarities() const {
     std::vector<std::vector<float>> directional(
         num_train_points, std::vector<float>(num_train_points, 0.0f));

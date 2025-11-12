@@ -759,6 +759,77 @@ PYBIND11_MODULE(chamfer, m) {
             )doc")
 
       .def(
+          "pairwise_similarities_to_train",
+          [](const Chamfer &self, py::array_t<float> queries,
+             py::array_t<int32_t> query_counts) {
+            py::buffer_info queries_buf = queries.request();
+            py::buffer_info counts_buf = query_counts.request();
+
+            if (queries_buf.ndim != 1) {
+              throw std::runtime_error(
+                  "queries must be a 1-dimensional array");
+            }
+            if (counts_buf.ndim != 1) {
+              throw std::runtime_error(
+                  "query_counts must be a 1-dimensional array");
+            }
+
+            bool queries_contiguous = queries_buf.strides[0] == sizeof(float);
+            if (!queries_contiguous) {
+              throw std::runtime_error(
+                  "queries array must be C-contiguous (use np.ascontiguousarray)");
+            }
+
+            bool counts_contiguous = counts_buf.strides[0] == sizeof(int32_t);
+            if (!counts_contiguous) {
+              throw std::runtime_error(
+                  "query_counts array must be C-contiguous (use np.ascontiguousarray)");
+            }
+
+            const float *queries_ptr = static_cast<float *>(queries_buf.ptr);
+            const int32_t *counts_ptr = static_cast<int32_t *>(counts_buf.ptr);
+            int num_queries = counts_buf.shape[0];
+
+            auto similarities = self.pairwise_similarities_to_train(
+                queries_ptr, counts_ptr, num_queries);
+
+            int num_points = self.train_point_count();
+
+            py::array_t<float> result_array({num_queries, num_points});
+            auto result_buf = result_array.request();
+            float *result_ptr = static_cast<float *>(result_buf.ptr);
+
+            for (int i = 0; i < num_queries; ++i) {
+              const auto &row = similarities[static_cast<size_t>(i)];
+              if (static_cast<int>(row.size()) != num_points) {
+                throw std::runtime_error(
+                    "pairwise similarities row size mismatch");
+              }
+              float *dest =
+                  result_ptr + static_cast<size_t>(i) * num_points;
+              std::copy(row.begin(), row.end(), dest);
+            }
+
+            return result_array;
+          },
+          py::arg("queries"), py::arg("query_counts"),
+          R"doc(
+                Compute Chamfer similarities from multiple queries to all training points.
+
+                Parameters
+                ----------
+                queries : numpy.ndarray
+                    1D array containing all query vectors concatenated.
+                query_counts : numpy.ndarray
+                    Number of vectors per query (shape: [num_queries])
+
+                Returns
+                -------
+                numpy.ndarray
+                    2D array where entry [i, j] equals chamfer(query_i -> train_j).
+            )doc")
+
+      .def(
           "pairwise_similarities",
           [](const Chamfer &self) {
             auto similarities = self.pairwise_similarities();
