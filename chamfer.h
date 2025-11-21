@@ -180,6 +180,87 @@ public:
           max_dot[i] = d;
       }
 
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+      auto hsum4 = [](float32x4_t v) -> float {
+#if defined(__aarch64__)
+        return vaddvq_f32(v);
+#else
+        float32x2_t sum = vadd_f32(vget_low_f32(v), vget_high_f32(v));
+        sum = vpadd_f32(sum, sum);
+        return vget_lane_f32(sum, 0);
+#endif
+      };
+
+      int32_t i = 0;
+      for (; i + 3 < count; i += 4) {
+        float32x4_t acc0 = vdupq_n_f32(0.f);
+        float32x4_t acc1 = vdupq_n_f32(0.f);
+        float32x4_t acc2 = vdupq_n_f32(0.f);
+        float32x4_t acc3 = vdupq_n_f32(0.f);
+
+        const float *q0 = q + (i + 0) * vec_dim;
+        const float *q1 = q + (i + 1) * vec_dim;
+        const float *q2 = q + (i + 2) * vec_dim;
+        const float *q3 = q + (i + 3) * vec_dim;
+
+        int k = 0;
+        for (; k + 3 < vec_dim; k += 4) {
+          float32x4_t tv = vld1q_f32(tj + k);
+#if defined(__aarch64__)
+          acc0 = vfmaq_f32(acc0, vld1q_f32(q0 + k), tv);
+          acc1 = vfmaq_f32(acc1, vld1q_f32(q1 + k), tv);
+          acc2 = vfmaq_f32(acc2, vld1q_f32(q2 + k), tv);
+          acc3 = vfmaq_f32(acc3, vld1q_f32(q3 + k), tv);
+#else
+          acc0 = vmlaq_f32(acc0, vld1q_f32(q0 + k), tv);
+          acc1 = vmlaq_f32(acc1, vld1q_f32(q1 + k), tv);
+          acc2 = vmlaq_f32(acc2, vld1q_f32(q2 + k), tv);
+          acc3 = vmlaq_f32(acc3, vld1q_f32(q3 + k), tv);
+#endif
+          __builtin_prefetch(tj + k + 16, 0, 1);
+        }
+
+        float d0 = hsum4(acc0);
+        float d1 = hsum4(acc1);
+        float d2 = hsum4(acc2);
+        float d3 = hsum4(acc3);
+
+        for (; k < vec_dim; ++k) {
+          const float tv = tj[k];
+          d0 += q0[k] * tv;
+          d1 += q1[k] * tv;
+          d2 += q2[k] * tv;
+          d3 += q3[k] * tv;
+        }
+
+        if (d0 > max_dot[i + 0])
+          max_dot[i + 0] = d0;
+        if (d1 > max_dot[i + 1])
+          max_dot[i + 1] = d1;
+        if (d2 > max_dot[i + 2])
+          max_dot[i + 2] = d2;
+        if (d3 > max_dot[i + 3])
+          max_dot[i + 3] = d3;
+      }
+
+      for (; i < count; ++i) {
+        const float *qi = q + i * vec_dim;
+        float32x4_t acc = vdupq_n_f32(0.f);
+        int k = 0;
+        for (; k + 3 < vec_dim; k += 4) {
+#if defined(__aarch64__)
+          acc = vfmaq_f32(acc, vld1q_f32(qi + k), vld1q_f32(tj + k));
+#else
+          acc = vmlaq_f32(acc, vld1q_f32(qi + k), vld1q_f32(tj + k));
+#endif
+        }
+        float d = hsum4(acc);
+        for (; k < vec_dim; ++k)
+          d += qi[k] * tj[k];
+        if (d > max_dot[i])
+          max_dot[i] = d;
+      }
+
 #else
       for (int32_t i = 0; i < count; ++i) {
         const float *qi = q + i * vec_dim;
